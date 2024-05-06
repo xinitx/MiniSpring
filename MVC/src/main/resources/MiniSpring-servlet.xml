@@ -1,0 +1,19 @@
+<beans>
+    <bean id="testController" class="org.init.test.controller.TestController"/>
+    <bean id="handlerMapping" class="org.init.mvc.servlet.method.annotation.RequestMappingHandlerMapping"/>
+    <bean id="viewResolver" class="org.init.mvc.servlet.view.InternalResourceViewResolver" >
+        <property type="String" name="viewClassName" value="org.init.mvc.servlet.view.JstlView" />
+        <property type="String" name="prefix" value="/jsp/" />
+        <property type="String" name="suffix" value=".jsp" />
+    </bean>
+    <bean id="objectMapper" class="org.init.core.util.DefaultObjectMapper" >
+        <property type="String" name="dateFormat" value="yyyy/MM/dd"/>
+        <property type="String" name="decimalFormat" value="###.##"/>
+    </bean>
+    <bean id="messageConverter" class="org.init.core.http.converter.DefaultHttpMessageConverter">
+        <property type="org.init.core.util.ObjectMapper" name="objectMapper" ref="objectMapper"/>
+    </bean>
+    <bean id="handlerAdapter" class="org.init.mvc.servlet.method.annotation.RequestMappingHandlerAdapter">
+        <property type="org.init.core.http.converter.HttpMessageConverter" name="messageConverter" ref="messageConverter"/>
+    </bean>
+</beans>
