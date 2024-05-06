@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans>
+    <bean id="targetBean" class="org.init.test.TestTargetBean">
+        <property type="org.init.test.TestInterface" name="testProxyCircle" ref="circle"/>
+    </bean>
+    <bean id="pointCut" class="org.init.test.TestPointCut">
+    </bean>
+    <bean id="circle" class="org.init.test.TestProxyCircle">
+        <property type="org.init.test.TestInterface" name="testTargetBean" ref="targetBean"/>
+    </bean>
+    <bean id="autoProxyCreator" class="org.init.aop.framework.DefaultAutoProxyCreator">
+
+    </bean>
+    <pointcut expression="execution(* org.init.test.TestTargetBean.test())"
+              id="testPointcut"/>
+    <aspect id="testAspect" ref="pointCut">
+        <before method="before"  pointcut-ref="testPointcut" />
+        <after method="after"  pointcut-ref="testPointcut" />
+    </aspect>
+</beans>
+
