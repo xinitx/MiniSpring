@@ -17,13 +17,16 @@ public abstract class PropertySource<T> {
         this.name = name;
         this.source = source;
     }
+
     public PropertySource(String name) {
         this(name, (T) new Object());
     }
     public Log getLogger() {
         return logger;
     }
-
+    public boolean containsProperty(String name) {
+        return this.getProperty(name) != null;
+    }
     public String getName() {
         return name;
     }
@@ -44,5 +47,39 @@ public abstract class PropertySource<T> {
 
     public String toString() {
         return this.logger.isDebugEnabled() ? this.getClass().getSimpleName() + "@" + System.identityHashCode(this) + " {name='" + this.name + "', properties=" + this.source + "}" : this.getClass().getSimpleName() + " {name='" + this.name + "'}";
+    }
+    public static PropertySource<?> named(String name) {
+        return new ComparisonPropertySource(name);
+    }
+    static class ComparisonPropertySource extends StubPropertySource {
+        private static final String USAGE_ERROR = "ComparisonPropertySource instances are for use with collection comparison only";
+
+        public ComparisonPropertySource(String name) {
+            super(name);
+        }
+
+        public Object getSource() {
+            throw new UnsupportedOperationException("ComparisonPropertySource instances are for use with collection comparison only");
+        }
+
+        public boolean containsProperty(String name) {
+            throw new UnsupportedOperationException("ComparisonPropertySource instances are for use with collection comparison only");
+        }
+
+        @Nullable
+        public String getProperty(String name) {
+            throw new UnsupportedOperationException("ComparisonPropertySource instances are for use with collection comparison only");
+        }
+    }
+
+    public static class StubPropertySource extends PropertySource<Object> {
+        public StubPropertySource(String name) {
+            super(name, new Object());
+        }
+
+        @Nullable
+        public String getProperty(String name) {
+            return null;
+        }
     }
 }

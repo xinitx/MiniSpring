@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans>
+    <bean id="serviceB" class="org.init.test.TestServiceB">
+        <property type="org.init.test.TestServiceA" name="testService" ref="serviceA"/>
+    </bean>
+    <bean id="serviceA" class="org.init.test.TestServiceAImpl">
+        <constructor-arg type="String" name="property1" value="abc"/>
+        <constructor-arg type="int" name="property2" value="3"/>
+        <property type="String" name="property3" value="Someone says"/>
+        <property type="String" name="property4" value="Hello World!"/>
+        <property type="org.init.test.TestServiceB" name="ref1" ref="serviceB"/>-->
+    </bean>
+    <bean id="testListener" class="org.init.test.TestListener">
+    </bean>
+
+</beans>

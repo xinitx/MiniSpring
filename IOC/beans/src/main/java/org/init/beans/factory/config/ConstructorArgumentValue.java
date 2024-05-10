@@ -39,5 +39,5 @@ public class ConstructorArgumentValue {
 			return this.name;
 		}
 
-	}
+}
 

@@ -1,5 +1,6 @@
 package org.init.beans.factory.support;
 
+import org.init.beans.BeanFactory;
 import org.init.beans.BeansException;
 import org.init.beans.BeanDefinition;
 import org.init.beans.factory.BeanPostProcessor;
@@ -11,13 +12,15 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport implements ConfigurableBeanFactory {
+
     private final Map<String, BeanDefinition> mergedBeanDefinitions = new ConcurrentHashMap(256);
     private final List<BeanPostProcessor> beanPostProcessors = new ArrayList();
     private final ThreadLocal<Object> prototypesCurrentlyInCreation = new ThreadLocal<>();
+    private BeanFactory parentBeanFactory;
     private boolean hasInstantiationAwareBeanPostProcessors;
     private ClassLoader beanClassLoader = ClassUtils.getDefaultClassLoader();
     @Override
-    public Object getBean(String beanName) throws BeansException, ClassNotFoundException {
+    public Object getBean(String beanName) throws BeansException {
         Object instance = this.getSingleton(beanName);
 
         if (instance == null) {
@@ -33,7 +36,11 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
                 });
             }else if (bd.isPrototype()){
                 this.beforePrototypeCreation(beanName);
-                instance = this.createBean(bd);
+                try {
+                    instance = this.createBean(bd);
+                } catch (ClassNotFoundException e) {
+                    throw new RuntimeException(e);
+                }
                 this.afterPrototypeCreation(beanName);
             }
         }
@@ -115,6 +122,10 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
             throw new RuntimeException(e);
         }
     }
+    @Override
+    public boolean isTypeMatch(String name, Class<?> typeToMatch) {
+        return false;
+    }
 
     @Override
     public void addBeanPostProcessor(BeanPostProcessor beanPostProcessor) {
@@ -122,6 +133,15 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
         this.beanPostProcessors.add(beanPostProcessor);
         if (beanPostProcessor instanceof InstantiationAwareBeanPostProcessor) {
             this.hasInstantiationAwareBeanPostProcessors = true;
+        }
+    }
+    public void setParentBeanFactory(BeanFactory parentBeanFactory){
+        if (this.parentBeanFactory != null && this.parentBeanFactory != parentBeanFactory) {
+            throw new IllegalStateException("Already associated with parent BeanFactory: " + this.parentBeanFactory);
+        } else if (this == parentBeanFactory) {
+            throw new IllegalStateException("Cannot set parent bean factory to self");
+        } else {
+            this.parentBeanFactory = parentBeanFactory;
         }
     }
     public List<BeanPostProcessor> getBeanPostProcessors() {
@@ -136,4 +156,12 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
     }
     protected abstract Object createBean(BeanDefinition bd) throws BeansException, ClassNotFoundException;
     protected abstract BeanDefinition getBeanDefinition(String var1) throws BeansException;
+    public BeanFactory getParentBeanFactory() {
+        return this.parentBeanFactory;
+    }
+    public boolean containsLocalBean(String name) {
+        //String beanName = this.transformedBeanName(name);
+        return (this.containsSingleton(name) || this.containsBeanDefinition(name));
+    }
+    protected abstract boolean containsBeanDefinition(String var1);
 }

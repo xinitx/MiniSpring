@@ -1,10 +1,10 @@
 package org.init.test;
 
 import org.init.beans.BeansException;
-import org.init.beans.factory.support.XmlBeanFactory;
+import org.init.beans.XmlBeanDefinitionReader;
+import org.init.beans.factory.support.DefaultListableBeanFactory;
 import org.init.context.ClassPathXmlApplicationContext;
-import org.init.core.io.ClassPathXmlResource;
-import org.init.aop.framework.DefaultAutoProxyCreator;
+
 
 public class AopTest {
     public static void main(String[] args) throws BeansException, ClassNotFoundException {

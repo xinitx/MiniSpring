@@ -1,5 +1,6 @@
 package org.init.mvc.context.support;
 
+import org.init.core.env.MutablePropertySources;
 import org.init.mvc.context.ConfigurableWebEnvironment;
 import org.init.core.env.PropertySource;
 import org.init.core.env.StandardEnvironment;
@@ -15,7 +16,7 @@ public class StandardServletEnvironment extends StandardEnvironment implements C
     public void initPropertySources(ServletContext var1, ServletConfig var2) {
 
     }
-    protected void customizePropertySources(List<PropertySource<?>> propertySources) {
+    protected void customizePropertySources(MutablePropertySources propertySources) {
         super.customizePropertySources(propertySources);
     }
 }

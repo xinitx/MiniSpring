@@ -18,12 +18,8 @@ public class BeanFactoryAdvisorRetrievalHelper {
         synchronized(this) {
             advisorNames = this.cachedAdvisorBeanNames;
             if (advisorNames == null) {
-                try {
-                    advisorNames = beanFactory.getBeanNamesForType(Advisor.class);
-                    this.cachedAdvisorBeanNames = advisorNames;
-                } catch (BeansException e) {
-                    throw new RuntimeException(e);
-                }
+                advisorNames = beanFactory.getBeanNamesForType(Advisor.class);
+                this.cachedAdvisorBeanNames = advisorNames;
             }
         }
         if (advisorNames.length == 0) {
@@ -37,8 +33,6 @@ public class BeanFactoryAdvisorRetrievalHelper {
                     try {
                         advisors.add((Advisor) this.beanFactory.getBean(name));
                     } catch (BeansException e) {
-                        throw new RuntimeException(e);
-                    } catch (ClassNotFoundException e) {
                         throw new RuntimeException(e);
                     }
                 }

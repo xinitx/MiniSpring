@@ -46,7 +46,6 @@ public class PropertyValue {
 	public Object getValue() {
 		return this.value;
 	}
-
 	public boolean getIsRef() {
 		return isRef;
 	}

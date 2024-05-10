@@ -1,6 +1,7 @@
 package org.init.context.support;
 
 
+import org.init.beans.BeanFactory;
 import org.init.beans.BeansException;
 import org.init.beans.factory.BeanFactoryPostProcessor;
 import org.init.beans.factory.BeanPostProcessor;
@@ -9,33 +10,51 @@ import org.init.beans.factory.support.BeanDefinitionRegistry;
 import org.init.beans.factory.support.DefaultListableBeanFactory;
 import org.init.context.ApplicationContext;
 import org.init.context.ConfigurableApplicationContext;
+import org.init.context.LifecycleProcessor;
 import org.init.context.event.*;
 import org.init.context.support.ApplicationContextAwareProcessor;
+import org.init.core.env.ConfigurableEnvironment;
 import org.init.core.env.Environment;
+import org.init.core.env.StandardEnvironment;
 import org.init.core.lang.Nullable;
+import org.init.core.util.Assert;
+import org.init.core.util.ObjectUtils;
+import org.init.core.util.ReflectionUtils;
 import org.init.test.TestListener;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public abstract class AbstractApplicationContext implements ConfigurableApplicationContext {
-	private Environment environment;
-
+	private ConfigurableEnvironment environment;
+	private Set<ApplicationListener<?>> earlyApplicationListeners;
+	private String id;
+	private String displayName;
+	private final Set<ApplicationListener<?>> applicationListeners;
+	private LifecycleProcessor lifecycleProcessor;
 	@Nullable
 	private ApplicationContext parent;
 	private final List<BeanFactoryPostProcessor> beanFactoryPostProcessors = new ArrayList<>();
 	private long startupDate;
+	private Thread shutdownHook;
+	private final Object startupShutdownMonitor;
 	private final AtomicBoolean active = new AtomicBoolean();
 	private final AtomicBoolean closed = new AtomicBoolean();
 	private ApplicationEventMulticaster applicationEventMulticaster;
-	
+	private Set<ApplicationEvent> earlyApplicationEvents;
+	public AbstractApplicationContext(){
+		this.id = ObjectUtils.identityToString(this);
+		this.applicationListeners = new LinkedHashSet();
+		this.startupShutdownMonitor = new Object();
+	}
 
+	public AbstractApplicationContext(@Nullable ApplicationContext parent) {
+		this();
+		this.setParent(parent);
+	}
 
 	@Override
-	public Object getBean(String beanName) throws BeansException, ClassNotFoundException {
+	public Object getBean(String beanName) throws BeansException {
 		return getBeanFactory().getBean(beanName);
 	}
 
@@ -47,7 +66,22 @@ public abstract class AbstractApplicationContext implements ConfigurableApplicat
 //	public void registerBean(String beanName, Object obj) {
 //		getBeanFactory().registerBean(beanName, obj);		
 //	}
-
+	public boolean isTypeMatch(String name, @Nullable Class<?> typeToMatch) {
+		this.assertBeanFactoryActive();
+		return this.getBeanFactory().isTypeMatch(name, typeToMatch);
+	}
+	protected void assertBeanFactoryActive() {
+		if (!this.active.get()) {
+			if (this.closed.get()) {
+				throw new IllegalStateException(this.getDisplayName() + " has been closed already");
+			} else {
+				throw new IllegalStateException(this.getDisplayName() + " has not been refreshed yet");
+			}
+		}
+	}
+	public String getDisplayName() {
+		return this.displayName;
+	}
 	@Override
 	public boolean isSingleton(String name) throws BeansException {
 		return getBeanFactory().isSingleton(name);
@@ -62,28 +96,43 @@ public abstract class AbstractApplicationContext implements ConfigurableApplicat
 	public Class<?> getType(String name) throws BeansException {
 		return getBeanFactory().getType(name);
 	}
-	
+
 	public List<BeanFactoryPostProcessor> getBeanFactoryPostProcessors() {
 		return this.beanFactoryPostProcessors;
 	}
-	
-	
+
+
 	public void refresh() throws BeansException, IllegalStateException {
-		this.prepareRefresh();
-		ConfigurableListableBeanFactory beanFactory = this.obtainFreshBeanFactory();
-		this.prepareBeanFactory(beanFactory);
+		synchronized(this.startupShutdownMonitor) {
+			//1. 初始化startupDate(System.currentTimeMillis())、closed(false)、active(true)、earlyApplicationEvents属性
+			//2. this.initPropertySources()空方法提供拓展，主要针对Environment对象，比如XmlWebApplicationContext父类AbstractRefreshableWebApplicationContext在这个方法给Environment对象添加了servletContext、servletConfig
+			//3. this.getEnvironment().validateRequiredProperties()方法验证环境，在this.initPropertySources()方法可以getEnvironment().setRequiredProperties("MYSQL_HOST"); 从而自定义环境变量验证，失败抛出异常
+			this.prepareRefresh();
 
-		postProcessBeanFactory(beanFactory);
-		invokeBeanFactoryPostProcessors(beanFactory);
-		registerBeanPostProcessors(beanFactory);
-		
-		initApplicationEventMulticaster();
+			ConfigurableListableBeanFactory beanFactory = this.obtainFreshBeanFactory();
+			this.prepareBeanFactory(beanFactory);
+			try {
+				this.postProcessBeanFactory(beanFactory);
+				this.invokeBeanFactoryPostProcessors(beanFactory);
+				this.registerBeanPostProcessors(beanFactory);
+				//消息处理，暂时为空
+				this.initMessageSource();
+				this.initApplicationEventMulticaster();
+				this.onRefresh();
+				this.registerListeners();
+				this.finishBeanFactoryInitialization(beanFactory);
+				this.finishRefresh();
+			}catch (BeansException var) {
+				System.out.println("Exception encountered during context initialization");
+				this.destroyBeans();
+				this.cancelRefresh(var);
+				throw var;
+			} finally {
+				this.resetCommonCaches();
+			}
 
-		onRefresh();
-		
-		registerListeners();
-		finishBeanFactoryInitialization(beanFactory);
-		finishRefresh();
+		}
+
 	}
 
 	private void finishBeanFactoryInitialization(ConfigurableListableBeanFactory beanFactory) {
@@ -95,16 +144,24 @@ public abstract class AbstractApplicationContext implements ConfigurableApplicat
 	}
 
 	private void invokeBeanFactoryPostProcessors(ConfigurableListableBeanFactory beanFactory) {
-		ArrayList currentRegistryProcessors;
-		String[] postProcessorNames;
-		Iterator var = this.beanFactoryPostProcessors.iterator();
-
-		while(var.hasNext()) {
-			BeanFactoryPostProcessor postProcessor = (BeanFactoryPostProcessor)var.next();
+		Iterator var1 = this.beanFactoryPostProcessors.iterator();
+		while(var1.hasNext()) {
+			BeanFactoryPostProcessor postProcessor = (BeanFactoryPostProcessor)var1.next();
 			try {
 				postProcessor.postProcessBeanFactory(beanFactory);
 			} catch (BeansException e) {
 				throw new RuntimeException(e);
+			}
+		}
+		String[] var2 = beanFactory.getBeanNamesForType(BeanFactoryPostProcessor.class);
+		for (String beanName : var2){
+			if (beanFactory.isTypeMatch(beanName, BeanFactoryPostProcessor.class)) {
+				try {
+					BeanFactoryPostProcessor postProcessor = (BeanFactoryPostProcessor)beanFactory.getBean(beanName);
+					postProcessor.postProcessBeanFactory(beanFactory);
+				} catch (BeansException e) {
+					throw new RuntimeException(e);
+				}
 			}
 		}
 	}
@@ -115,11 +172,29 @@ public abstract class AbstractApplicationContext implements ConfigurableApplicat
 		//必要BeanPostProcessor
 		beanFactory.addBeanPostProcessor(new ApplicationContextAwareProcessor(this));
 		beanFactory.addBeanPostProcessor(new ApplicationListenerDetector(this));
+		if (!beanFactory.containsLocalBean("environment")) {
+			beanFactory.registerSingleton("environment", this.getEnvironment());
+		}
+
+		if (!beanFactory.containsLocalBean("systemProperties")) {
+			beanFactory.registerSingleton("systemProperties", this.getEnvironment().getSystemProperties());
+		}
+
+		if (!beanFactory.containsLocalBean("systemEnvironment")) {
+			beanFactory.registerSingleton("systemEnvironment", this.getEnvironment().getSystemEnvironment());
+		}
 	}
 
 	private void prepareRefresh() {
+		this.startupDate = System.currentTimeMillis();
+		this.closed.set(false);
+		this.active.set(true);
+		this.initPropertySources();
+		this.getEnvironment().validateRequiredProperties();
+		this.earlyApplicationEvents = new LinkedHashSet();
 	}
-
+	protected void initPropertySources() {
+	}
 	protected ConfigurableListableBeanFactory obtainFreshBeanFactory() {
 		try {
 			this.refreshBeanFactory();
@@ -129,20 +204,30 @@ public abstract class AbstractApplicationContext implements ConfigurableApplicat
 		ConfigurableListableBeanFactory beanFactory = this.getBeanFactory();
 		return beanFactory;
 	}
-	
+
 	protected void registerListeners(){
-		ApplicationListener listener = (ApplicationListener) new TestListener();
-		this.getApplicationEventMulticaster().addApplicationListener(listener);
+		try {
+			String[] listenerBeanNames = this.getBeanNamesForType(ApplicationListener.class);
+			for (String listenerBeanName : listenerBeanNames){
+				ApplicationListener listener = (ApplicationListener) this.getBean(listenerBeanName);
+				this.getApplicationEventMulticaster().addApplicationListener(listener);
+			}
+		} catch (BeansException e) {
+			throw new RuntimeException(e);
+		}
 	};
+
 	protected void initApplicationEventMulticaster(){
 		ConfigurableListableBeanFactory beanFactory = this.getBeanFactory();
 		this.applicationEventMulticaster = new SimpleApplicationEventMulticaster(beanFactory);
 		beanFactory.registerSingleton("applicationEventMulticaster", this.applicationEventMulticaster);
 
 	};
+
 	protected void postProcessBeanFactory(ConfigurableListableBeanFactory bf){
 		//子类去处理
 	};
+
 	protected void registerBeanPostProcessors(ConfigurableListableBeanFactory bf){
 		String[] postProcessorNames;
 		try {
@@ -151,18 +236,21 @@ public abstract class AbstractApplicationContext implements ConfigurableApplicat
 				BeanPostProcessor pp = (BeanPostProcessor) bf.getBean(postProcessorName);
 				bf.addBeanPostProcessor(pp);
 			}
-
 		} catch (BeansException e) {
-			throw new RuntimeException(e);
-		} catch (ClassNotFoundException e) {
 			throw new RuntimeException(e);
 		}
 	};
-	protected void onRefresh(){
+
+	protected void onRefresh() throws BeansException{
 
 	};
+
 	protected abstract void refreshBeanFactory() throws BeansException, IllegalStateException;
+
 	protected void finishRefresh(){
+		//this.clearResourceCaches();
+		this.initLifecycleProcessor();
+		this.getLifecycleProcessor().onRefresh();
 		this.publishEvent(new ContextRefreshEvent("Context Refreshed..."));
 	}
 
@@ -207,7 +295,7 @@ public abstract class AbstractApplicationContext implements ConfigurableApplicat
 	}
 
 	@Override
-	public String[] getBeanNamesForType(Class<?> type) throws BeansException {
+	public String[] getBeanNamesForType(Class<?> type) {
 		return getBeanFactory().getBeanNamesForType(type);
 	}
 
@@ -216,54 +304,61 @@ public abstract class AbstractApplicationContext implements ConfigurableApplicat
 		return getBeanFactory().getBeansOfType(type);
 	}
 
-	@Override
+
 	public void addBeanPostProcessor(BeanPostProcessor beanPostProcessor) {
 		getBeanFactory().addBeanPostProcessor(beanPostProcessor);
-		
+
 	}
 
-	@Override
+
 	public int getBeanPostProcessorCount() {
 		return getBeanFactory().getBeanPostProcessorCount();
 	}
 
-	@Override
+
 	public void registerDependentBean(String beanName, String dependentBeanName) {
 		getBeanFactory().registerDependentBean(beanName, dependentBeanName);
 	}
 
-	@Override
+
 	public String[] getDependentBeans(String beanName) {
 		return getBeanFactory().getDependentBeans(beanName);
 	}
 
-	@Override
+
 	public String[] getDependenciesForBean(String beanName) {
 		return getBeanFactory().getDependenciesForBean(beanName);
 	}
 
-	
+
 	@Override
 	public String getApplicationName() {
 		return "";
 	}
+
 	@Override
 	public long getStartupDate() {
 		return this.startupDate;
 	}
+
 	@Override
 	public abstract ConfigurableListableBeanFactory getBeanFactory() throws IllegalStateException;
-	
-	@Override
-	public void setEnvironment(Environment environment) {
+
+    @Override
+	public void setEnvironment(ConfigurableEnvironment environment) {
 		this.environment = environment;
 	}
-	
+
 	@Override
-	public Environment getEnvironment() {
+	public ConfigurableEnvironment getEnvironment() {
+		if (this.environment == null) {
+			this.environment = this.createEnvironment();
+		}
 		return this.environment;
 	}
-	
+	protected ConfigurableEnvironment createEnvironment() {
+		return new StandardEnvironment();
+	}
 	@Override
 	public void addBeanFactoryPostProcessor(BeanFactoryPostProcessor postProcessor) {
 		this.beanFactoryPostProcessors.add(postProcessor);
@@ -283,7 +378,11 @@ public abstract class AbstractApplicationContext implements ConfigurableApplicat
 	@Override
 	public void close() {
 	}
-	
+
+	public void setId(String id) {
+		this.id = id;
+	}
+
 	@Override
 	public boolean isActive() {
 		return true;
@@ -293,7 +392,118 @@ public abstract class AbstractApplicationContext implements ConfigurableApplicat
 		return applicationEventMulticaster;
 	}
 
+	@Nullable
+	protected BeanFactory getInternalParentBeanFactory() {
+		ApplicationContext p = this.getParent();
+		Object var;
+		if (p instanceof ConfigurableApplicationContext ) {
+			var = p.getBeanFactory();
+		} else {
+			var = this.getParent();
+		}
+
+		return (BeanFactory)var;
+	}
+
+	public void addApplicationListener(ApplicationListener<?> listener) {
+		Assert.notNull(listener, "ApplicationListener must not be null");
+		if (this.applicationEventMulticaster != null) {
+			this.applicationEventMulticaster.addApplicationListener(listener);
+		}
+
+		this.applicationListeners.add(listener);
+	}
+
+	public BeanFactory getParentBeanFactory() {
+		return this.getParent();
+	}
+
+	public boolean containsLocalBean(String name) {
+		return this.getBeanFactory().containsLocalBean(name);
+	}
+
 	public void setApplicationEventPublisher(ApplicationEventMulticaster applicationEventPublisher) {
 		this.applicationEventMulticaster = applicationEventPublisher;
 	}
+
+	public void registerShutdownHook() {
+		if (this.shutdownHook == null) {
+			this.shutdownHook = new Thread("SpringContextShutdownHook") {
+				public void run() {
+					synchronized(AbstractApplicationContext.this.startupShutdownMonitor) {
+						AbstractApplicationContext.this.doClose();
+					}
+				}
+			};
+			Runtime.getRuntime().addShutdownHook(this.shutdownHook);
+		}
+
+	}
+
+	protected void doClose() {
+		if (this.active.get() && this.closed.compareAndSet(false, true)) {
+			System.out.println("SpringContext Shutdown...");
+			this.publishEvent((ApplicationEvent)(new ContextClosedEvent(this)));
+			this.destroyBeans();
+			this.closeBeanFactory();
+			this.onClose();
+			if (this.earlyApplicationListeners != null) {
+				this.applicationListeners.clear();
+				this.applicationListeners.addAll(this.earlyApplicationListeners);
+			}
+
+			this.active.set(false);
+		}
+	}
+
+	protected void onClose() {
+	}
+
+	protected abstract void closeBeanFactory();
+
+	protected void destroyBeans() {
+		this.getBeanFactory().destroySingletons();
+	}
+	protected void initLifecycleProcessor() {
+		ConfigurableListableBeanFactory beanFactory = this.getBeanFactory();
+		if (beanFactory.containsLocalBean("lifecycleProcessor")) {
+			try {
+				this.lifecycleProcessor = (LifecycleProcessor)beanFactory.getBean("lifecycleProcessor");
+			} catch (BeansException e) {
+				throw new RuntimeException(e);
+			}
+		} else {
+			DefaultLifecycleProcessor defaultProcessor = new DefaultLifecycleProcessor();
+			defaultProcessor.setBeanFactory(beanFactory);
+			this.lifecycleProcessor = defaultProcessor;
+			beanFactory.registerSingleton("lifecycleProcessor", this.lifecycleProcessor);
+		}
+	}
+	public void start() {
+		this.getLifecycleProcessor().start();
+		this.publishEvent((ApplicationEvent)(new ContextStartedEvent(this)));
+	}
+
+	public void stop() {
+		this.getLifecycleProcessor().stop();
+		this.publishEvent((ApplicationEvent)(new ContextStoppedEvent(this)));
+	}
+	LifecycleProcessor getLifecycleProcessor() throws IllegalStateException {
+		if (this.lifecycleProcessor == null) {
+			throw new IllegalStateException("LifecycleProcessor not initialized - call 'refresh' before invoking lifecycle methods via the context: " + this);
+		} else {
+			return this.lifecycleProcessor;
+		}
+	}
+
+	protected void cancelRefresh(BeansException ex) {
+		this.active.set(false);
+	}
+	protected void resetCommonCaches() {
+		ReflectionUtils.clearCache();
+	}
+	protected void initMessageSource() {
+		//暂无
+	}
+
 }

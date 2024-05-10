@@ -10,7 +10,7 @@ public interface ConfigurableEnvironment extends Environment, ConfigurableProper
 
     void setDefaultProfiles(String... var1);
 
-    List<PropertySource<?>> getPropertySources();
+    MutablePropertySources getPropertySources();
 
     Map<String, Object> getSystemEnvironment();
 

@@ -90,8 +90,6 @@ public class DispatcherServlet extends FrameworkServlet  {
             this.handlerMapping = (HandlerMapping) wac.getBean(HANDLER_MAPPING_BEAN_NAME);
         } catch (BeansException e) {
             e.printStackTrace();
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
         }
 
     }
@@ -100,8 +98,6 @@ public class DispatcherServlet extends FrameworkServlet  {
             this.handlerAdapter = (HandlerAdapter) wac.getBean(HANDLER_ADAPTER_BEAN_NAME);
         } catch (BeansException e) {
             e.printStackTrace();
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
         }
 
     }
@@ -110,8 +106,6 @@ public class DispatcherServlet extends FrameworkServlet  {
             this.viewResolver = (ViewResolver) wac.getBean(VIEW_RESOLVER_BEAN_NAME);
         } catch (BeansException e) {
             e.printStackTrace();
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
         }
     }
 }

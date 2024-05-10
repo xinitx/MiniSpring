@@ -1,22 +1,57 @@
 package org.init.beans;
 
+import org.dom4j.Document;
+import org.dom4j.DocumentException;
 import org.dom4j.Element;
+import org.dom4j.io.SAXReader;
 import org.init.beans.factory.config.ConstructorArgumentValue;
 import org.init.beans.factory.config.PropertyValue;
 import org.init.beans.factory.support.BeanDefinitionRegistry;
+import org.init.core.env.Environment;
+import org.init.core.io.ClassPathResource;
 import org.init.core.io.Resource;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
 public class XmlBeanDefinitionReader {
-    BeanDefinitionRegistry beanFactory;
-    private int count=-1;
+    private final BeanDefinitionRegistry beanFactory;
+    private static volatile int count = - 1;
+
     public XmlBeanDefinitionReader(BeanDefinitionRegistry beanFactory) {
         this.beanFactory = beanFactory;
     }
+    public void loadBeanDefinitions(String location) {
+        loadBeanDefinitions(new ClassPathResource(location));
+    }
     public void loadBeanDefinitions(Resource res) {
+        try {
+            // 获取资源输入流
+            InputStream inputStream = res.getInputStream();
+            // 创建SAXReader实例
+            SAXReader reader = new SAXReader();
+            // 使用InputStream读取XML，源代码中会将InputStream包装成InputSource
+            Document doc = reader.read(inputStream);
+            //源代码是DefaultBeanDefinitionDocumentReader处理
+            registerBeanDefinitions(doc);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } catch (DocumentException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * 根据XML文档注册BeanDefinition和aop配置
+     * 源代码中是BeanDefinitionDocumentReader和AopNamespaceHandler处理
+     * @param doc
+     */
+    private void registerBeanDefinitions(Document doc) {
+        Element rootElement = doc.getRootElement();
+        Iterator res = rootElement.elementIterator();
         while (res.hasNext()) {
             Element element = (Element)res.next();
             String beanID=element.attributeValue("id");
@@ -65,8 +100,6 @@ public class XmlBeanDefinitionReader {
             beanDefinition.setPropertyValues(propertyValues);
             String[] refArray = refs.toArray(new String[0]);
             beanDefinition.setDependsOn(refArray);
-
-
             this.beanFactory.registerBeanDefinition(beanID,beanDefinition);
         }
     }
@@ -153,5 +186,7 @@ public class XmlBeanDefinitionReader {
         this.beanFactory.registerBeanDefinition(beanID,beanDefinition);
     }
 
-
+    public BeanDefinitionRegistry getBeanFactory() {
+        return beanFactory;
+    }
 }

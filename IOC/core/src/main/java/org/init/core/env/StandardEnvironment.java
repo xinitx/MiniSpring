@@ -9,7 +9,9 @@ public class StandardEnvironment extends AbstractEnvironment {
     public StandardEnvironment() {
     }
 
-    protected void customizePropertySources(List<PropertySource<?>> propertySources) {
-
+    protected void customizePropertySources(MutablePropertySources propertySources) {
+        propertySources.addLast(new PropertiesPropertySource("systemProperties", this.getSystemProperties()));
+        propertySources.addLast(new SystemEnvironmentPropertySource("systemEnvironment", this.getSystemEnvironment()));
     }
+
 }

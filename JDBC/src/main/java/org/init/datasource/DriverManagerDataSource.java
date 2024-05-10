@@ -9,6 +9,7 @@ import java.sql.SQLException;
 import java.util.Properties;
 
 public class DriverManagerDataSource extends AbstractDriverBasedDataSource  {
+    private String driverClassName;
     public DriverManagerDataSource() {
     }
 
@@ -30,7 +31,7 @@ public class DriverManagerDataSource extends AbstractDriverBasedDataSource  {
             throw new IllegalStateException("Property 'driverClassName' must not be empty");
         }
         String driverClassNameToUse = driverClassName.trim();
-
+        this.driverClassName = driverClassNameToUse;
         try {
             Class.forName(driverClassNameToUse, true, ClassUtils.getDefaultClassLoader());
         } catch (ClassNotFoundException var4) {
@@ -57,5 +58,7 @@ public class DriverManagerDataSource extends AbstractDriverBasedDataSource  {
     protected Connection getConnectionFromDriverManager(String url, Properties props) throws SQLException {
         return DriverManager.getConnection(url, props);
     }
-
+    public String getDriver() {
+        return this.driverClassName;
+    }
 }

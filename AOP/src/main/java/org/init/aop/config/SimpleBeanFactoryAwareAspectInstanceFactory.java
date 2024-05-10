@@ -24,8 +24,6 @@ public class SimpleBeanFactoryAwareAspectInstanceFactory implements AspectInstan
             return this.beanFactory.getBean(this.aspectBeanName);
         } catch (BeansException e) {
             throw new RuntimeException(e);
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
         }
     }
 

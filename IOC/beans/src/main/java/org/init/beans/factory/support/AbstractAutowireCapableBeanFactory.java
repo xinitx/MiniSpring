@@ -1,6 +1,7 @@
 package org.init.beans.factory.support;
 
 import org.init.beans.BeanDefinition;
+import org.init.beans.BeanFactory;
 import org.init.beans.BeansException;
 import org.init.beans.factory.*;
 import org.init.beans.factory.config.ConstructorArgumentValue;
@@ -14,6 +15,14 @@ import java.util.Iterator;
 import java.util.List;
 
 public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFactory implements AutowireCapableBeanFactory {
+    private boolean allowCircularReferences = true;
+    public AbstractAutowireCapableBeanFactory() {
+
+    }
+    public AbstractAutowireCapableBeanFactory(BeanFactory parentBeanFactory) {
+        this.setParentBeanFactory(parentBeanFactory);
+    }
+
     @Override
     public Object applyBeanPostProcessorsBeforeInitialization(Object existingBean, String beanName) throws BeansException {
         Object result = existingBean;
@@ -129,8 +138,6 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 
                     } catch (BeansException e) {
                         e.printStackTrace();
-                    } catch (ClassNotFoundException e) {
-                        throw new RuntimeException(e);
                     }
                 }
 
@@ -333,5 +340,10 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
         return obj;
     }
 
-
+    public boolean isAllowCircularReferences() {
+        return this.allowCircularReferences;
+    }
+    public void setAllowCircularReferences(boolean allowCircularReferences) {
+        this.allowCircularReferences = allowCircularReferences;
+    }
 }

@@ -4,7 +4,7 @@ package org.init.beans.factory.config;
 import org.init.beans.BeanFactory;
 import org.init.beans.factory.BeanPostProcessor;
 
-public interface ConfigurableBeanFactory extends BeanFactory, SingletonBeanRegistry {
+public interface ConfigurableBeanFactory extends HierarchicalBeanFactory, SingletonBeanRegistry {
 
 	String SCOPE_SINGLETON = "singleton";
 	String SCOPE_PROTOTYPE = "prototype";
@@ -19,6 +19,6 @@ public interface ConfigurableBeanFactory extends BeanFactory, SingletonBeanRegis
 
 	String[] getDependenciesForBean(String beanName);
 	ClassLoader getBeanClassLoader();
-
+	void destroySingletons();
 }
 

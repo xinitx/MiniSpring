@@ -1,5 +1,6 @@
 package org.init.beans.factory.support;
 
+import org.init.beans.BeanFactory;
 import org.init.beans.BeansException;
 import org.init.beans.BeanDefinition;
 import org.init.beans.factory.config.ConfigurableListableBeanFactory;
@@ -10,7 +11,15 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFactory implements ConfigurableListableBeanFactory, BeanDefinitionRegistry, Serializable {
     private final Map<String, BeanDefinition> beanDefinitionMap = new ConcurrentHashMap(256);
+    private boolean allowBeanDefinitionOverriding = true;
     private volatile List<String> beanDefinitionNames = new ArrayList(256);
+    public DefaultListableBeanFactory() {
+
+    }
+    public DefaultListableBeanFactory(BeanFactory parentBeanFactory) {
+        super(parentBeanFactory);
+    }
+
     @Override
     public boolean containsBeanDefinition(String beanName) {
         return beanDefinitionNames.contains(beanName);
@@ -27,7 +36,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
     }
 
     @Override
-    public String[] getBeanNamesForType(Class<?> type) throws BeansException {
+    public String[] getBeanNamesForType(Class<?> type) {
         List<String> result = new ArrayList<>();
 
         for (String beanName : this.beanDefinitionNames) {
@@ -40,7 +49,6 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
             else {
                 matchFound = false;
             }
-
             if (matchFound) {
                 result.add(beanName);
             }
@@ -83,13 +91,24 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
         for (String beanName : beanNames){
             BeanDefinition bd = this.getBeanDefinition(beanName);
             if(bd.isSingleton()){
-                try {
-                    this.getBean(beanName);
-                } catch (ClassNotFoundException e) {
-                    throw new RuntimeException(e);
-                }
+                this.getBean(beanName);
             }
         }
 
     }
+    public void destroySingleton(String beanName) {
+        super.destroySingleton(beanName);
+
+    }
+    public void destroySingletons() {
+        this.beanNames.clear();
+    }
+    public void setAllowBeanDefinitionOverriding(boolean allowBeanDefinitionOverriding) {
+        this.allowBeanDefinitionOverriding = allowBeanDefinitionOverriding;
+    }
+    public boolean isAllowBeanDefinitionOverriding() {
+        return this.allowBeanDefinitionOverriding;
+    }
+
+
 }

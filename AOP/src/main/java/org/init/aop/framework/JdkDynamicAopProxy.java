@@ -27,7 +27,6 @@ public class JdkDynamicAopProxy implements AopProxy, InvocationHandler, Serializ
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         Integer var_hashcode;
-        System.out.println(888);
         if(method.getName().equals("equals")){
             Class<?>[] paramTypes = method.getParameterTypes();
             if(paramTypes.length == 1 && paramTypes[0] == Object.class){

@@ -6,16 +6,17 @@ import org.init.beans.factory.config.ConfigurableBeanFactory;
 import org.init.beans.factory.config.ConfigurableListableBeanFactory;
 import org.init.beans.factory.config.ListableBeanFactory;
 import org.init.context.event.ApplicationEventPublisher;
+import org.init.core.env.ConfigurableEnvironment;
 import org.init.core.env.Environment;
 import org.init.core.env.EnvironmentCapable;
 import org.init.core.lang.Nullable;
 
-public interface ApplicationContext extends EnvironmentCapable, ListableBeanFactory, ConfigurableBeanFactory, ApplicationEventPublisher {
+public interface ApplicationContext extends EnvironmentCapable, ListableBeanFactory, HierarchicalBeanFactory, ApplicationEventPublisher {
     String getApplicationName();
     long getStartupDate();
     ConfigurableListableBeanFactory getBeanFactory() throws IllegalStateException;
-    void setEnvironment(Environment environment);
-    Environment getEnvironment();
+    void setEnvironment(ConfigurableEnvironment var1);
+    ConfigurableEnvironment getEnvironment();
     void addBeanFactoryPostProcessor(BeanFactoryPostProcessor postProcessor);
     void refresh() throws BeansException, IllegalStateException;
     void close();

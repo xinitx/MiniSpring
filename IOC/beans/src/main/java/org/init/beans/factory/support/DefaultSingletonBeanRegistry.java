@@ -159,4 +159,8 @@ public class DefaultSingletonBeanRegistry implements SingletonBeanRegistry {
 			return (String[]) dependenciesForBean.toArray();
 
 		}
+		public void destroySingleton(String beanName) {
+			this.removeSingleton(beanName);
+		}
+
 }

@@ -13,7 +13,7 @@ public interface ListableBeanFactory extends BeanFactory {
 
 	String[] getBeanDefinitionNames();
 
-	String[] getBeanNamesForType(Class<?> type) throws BeansException;
+	String[] getBeanNamesForType(Class<?> type);
 
 	<T> Map<String, T> getBeansOfType(Class<T> type) throws BeansException, ClassNotFoundException;
 

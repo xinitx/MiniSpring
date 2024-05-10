@@ -29,8 +29,6 @@ public class RequestMappingHandlerMapping implements HandlerMapping, Application
 				clz = obj.getClass();
 			} catch (BeansException e) {
 				e.printStackTrace();
-			} catch (ClassNotFoundException e) {
-				throw new RuntimeException(e);
 			}
 			Method[] methods = clz.getDeclaredMethods();
     		if(methods!=null){
